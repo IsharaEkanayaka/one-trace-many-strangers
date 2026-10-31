@@ -1,26 +1,35 @@
 services:
-  gateway:
-    image: nginx:1.27-alpine
-    depends_on:
-      - backend
+  jaeger:
+    image: jaegertracing/jaeger:2.4.0
     ports:
-      - "8080:8080"
-    volumes:
-      - ./gateway/nginx.conf:/etc/nginx/nginx.conf:ro
-
-  backend:
-    image: golang:1.22-alpine
-    working_dir: /app
-    command: ["go", "run", "."]
-    volumes:
-      - ./backend:/app
-    expose:
-      - "8080"
+      - "16686:16686"   # Jaeger UI + query API
 
   collector:
-    image: otel/opentelemetry-collector-contrib:0.109.0
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    image: otel/opentelemetry-collector:0.119.0
+    command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
-      - ./collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./collector/config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - jaeger
+
+  backend:
+    build: ./app
+    environment:
+      OTEL_SERVICE_NAME: demo-backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+      OTEL_BSP_SCHEDULE_DELAY: "1000"   # export spans after 1s instead of 5s
+    depends_on:
+      - collector
+
+  gateway:
+    image: nginx:1.27
     ports:
-      - "4318:4318"
+      - "8081:80"
+    volumes:
+      # GATEWAY_MODE=passthrough (default) or strip
+      - ./gateway/nginx.${GATEWAY_MODE:-passthrough}.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend

@@ -9,7 +9,8 @@ JAEGER=http://localhost:16686
 GATEWAY=http://localhost:8081
 
 count_traces() {
-  curl -s "$JAEGER/api/traces?service=demo-backend&lookback=1h&limit=100" | jq '.data | length'
+  curl -s "$JAEGER/api/traces?service=demo-backend&lookback=1h&limit=100" \
+    | { grep -o '"traceID": *"[0-9a-f]*"' || true; } | sort -u | wc -l | tr -d ' '
 }
 
 run() {
@@ -24,12 +25,12 @@ run() {
   local before; before=$(count_traces)
 
   curl -s -H "traceparent: $tp" "$GATEWAY/status/123" >/dev/null
-  curl -s -H "traceparent: $tp" "$GATEWAY/status/456" >/dev/null
+  curl -s -H "traceparent: $tp" "$GATEWAY/orders/456" >/dev/null
   sleep 4   # let the agent, collector and Jaeger catch up
 
   local after; after=$(count_traces)
   local joined
-  joined=$(curl -s "$JAEGER/api/traces/$trace_id" | jq '[.data[0].spans // [] | .[] | select(.references | length > 0)] | length')
+  joined=$(curl -s "$JAEGER/api/traces/$trace_id" | { grep -o '"spanID"' || true; } | wc -l | tr -d ' ')
 
   echo "caller's trace ID:               $trace_id"
   echo "server spans under that trace:   $joined"

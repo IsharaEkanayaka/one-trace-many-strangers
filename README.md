@@ -29,7 +29,7 @@ request starts its own trace.
 docker compose up -d --build                     # passthrough
 TP="00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 curl -H "traceparent: $TP" http://localhost:8081/status/123
-curl -H "traceparent: $TP" http://localhost:8081/status/456
+curl -H "traceparent: $TP" http://localhost:8081/orders/456
 # open http://localhost:16686 and look up trace 4bf92f3577b34da6a3ce929d0e0e4736
 
 GATEWAY_MODE=strip docker compose up -d --force-recreate gateway
